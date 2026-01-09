@@ -30,7 +30,11 @@ kotlin {
 val compileKotlin: KotlinCompile by tasks
 
 compileKotlin.compilerOptions {
-    freeCompilerArgs.set(listOf("-Xcontext-parameters", "-Xcontext-sensitive-resolution"))
+    freeCompilerArgs.addAll(
+        "-Xcontext-parameters",
+        "-Xcontext-sensitive-resolution",
+        "-Xexplicit-backing-fields"
+    )
 }
 
 application {
