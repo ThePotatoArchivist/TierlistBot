@@ -153,11 +153,18 @@ suspend fun ComponentInteractionCreateEvent.onMoveEntry() {
     val entry = (interaction as SelectMenuInteraction).values.firstOrNull() ?: return
     val tierlist = STATE[interaction.channel]
     val tier = tierlist.selectedTier
+    val oldTier = tierlist.tierlist.tiers.find { entry in it.entries } ?: return
+    if (tier == oldTier) {
+        interaction.respondEphemeral {
+            content = "**${entry}** is already in **${oldTier.name}**"
+        }
+        return
+    }
     interaction.deferPublicMessageUpdate()
-    tierlist.tierlist.remove(entry)
+    oldTier.entries.remove(entry)
     tier.entries.add(entry)
 
-    commitChange(tierlist, "**${interaction.user.displayName}** moved **$entry** to **${tier.name}**")
+    commitChange(tierlist, "**${interaction.user.displayName}** moved **$entry** from **${oldTier.name}** to **${tier.name}**")
 }
 
 suspend fun ComponentInteractionCreateEvent.onRemoveEntry() {
