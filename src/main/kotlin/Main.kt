@@ -13,7 +13,6 @@ import dev.kord.core.event.interaction.ModalSubmitInteractionCreateEvent
 import dev.kord.core.on
 import io.github.cdimascio.dotenv.Dotenv
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.io.files.FileNotFoundException
 import kotlinx.serialization.json.Json
@@ -21,14 +20,10 @@ import java.io.File
 
 val STATES_FILE = File("state.json")
 
-val STATE = runBlocking {
-    try {
-        Json.decodeFromString<State>(STATES_FILE.readText())
-    } catch (_: FileNotFoundException) {
-        State().also {
-            saveState()
-        }
-    }
+val STATE = try {
+    Json.decodeFromString<State>(STATES_FILE.readText())
+} catch (_: FileNotFoundException) {
+    State()
 }
 
 suspend fun saveState(states: State = STATE) {
@@ -68,6 +63,9 @@ suspend fun main() {
         on<ComponentInteractionCreateEvent> {
             when (interaction.componentId) {
                 "add" -> onAdd()
+                "done" -> onDone()
+                "move_entry" -> onMoveEntry()
+                "move_tier" -> onMoveTier()
             }
         }
 

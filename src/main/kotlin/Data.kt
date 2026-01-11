@@ -18,6 +18,7 @@ data class State(
         tierlists[channel.id] = tierlist
     }
     operator fun contains(channel: ChannelBehavior) = channel.id in tierlists
+    fun remove(channel: ChannelBehavior) = tierlists.remove(channel.id)
 }
 
 @OptIn(KordUnsafe::class, KordExperimental::class)
@@ -26,7 +27,8 @@ data class ReferencedTierlist(
     val channelId: Snowflake,
     val messageId: Snowflake,
     val threadId: Snowflake,
-    val tierlist: Tierlist = Tierlist(),
+    val tierlist: Tierlist,
+    var selectedEntry: String? = null,
 ) {
     @Transient val message = contextualMemoize<KordObject, _> { it.kord.unsafe.message(channelId, messageId) }
     @Transient val thread = contextualMemoize<KordObject, _> { it.kord.unsafe.messageChannel(threadId) }
@@ -48,13 +50,5 @@ data class Tierlist(
 data class Tier(
     var name: String,
     var color: Int,
-    val entries: MutableSet<TierEntry> = mutableSetOf(),
+    val entries: MutableSet<String> = mutableSetOf(),
 )
-
-@Serializable
-data class TierEntry(
-    val name: String,
-    val icon: String?,
-) {
-    override fun toString(): String = if (icon == null) name else "$icon $name"
-}
