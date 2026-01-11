@@ -3,14 +3,12 @@
 package archives.tater.bot.tierlist
 
 import dev.kord.core.Kord
-import dev.kord.core.behavior.interaction.respondEphemeral
-import dev.kord.core.behavior.interaction.respondPublic
-import dev.kord.core.cache.data.toData
 import dev.kord.core.event.gateway.ReadyEvent
 import dev.kord.core.event.interaction.ChatInputCommandInteractionCreateEvent
 import dev.kord.core.event.interaction.ComponentInteractionCreateEvent
 import dev.kord.core.event.interaction.ModalSubmitInteractionCreateEvent
 import dev.kord.core.on
+import dev.kord.rest.builder.interaction.string
 import io.github.cdimascio.dotenv.Dotenv
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -37,27 +35,17 @@ suspend fun main() {
 
     with (Kord(dotenv["BOT_TOKEN"])) {
 
-        val tierlistCommand = createGlobalChatInputCommand("tierlist", "Create a tier list")
+        val tierlistCommand = createGlobalChatInputCommand("tierlist", "Create a tier list") {
+            string("name", "Name of the tier list") {
+                minLength = 1
+                required = true
+            }
+        }
 
         on<ChatInputCommandInteractionCreateEvent> {
-            if (interaction.command.rootId != tierlistCommand.id) return@on
-
-            if (interaction.channel in STATE) {
-                interaction.respondEphemeral {
-                    content = "This channel already has a tierlist in it!"
-                }
-                return@on
+            when (interaction.command.rootId) {
+                tierlistCommand.id -> onTierlist()
             }
-
-            val tierlist = Tierlist()
-
-            val response = interaction.respondPublic {
-                initTierList(tierlist)
-            }
-            val responseData = kord.rest.interaction.getInteractionResponse(response.applicationId, response.token).toData()
-
-            STATE[interaction.channel] = createThread("Tierlist", tierlist, interaction.channel, responseData.id)
-            saveState()
         }
 
         on<ComponentInteractionCreateEvent> {

@@ -36,6 +36,7 @@ data class ReferencedTierlist(
 
 @Serializable
 data class Tierlist(
+    val name: String,
     val tiers: MutableList<Tier> = mutableListOf(
         Tier("S", 0xff0000),
         Tier("A", 0xff5500),

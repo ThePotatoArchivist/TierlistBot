@@ -2,15 +2,17 @@ package archives.tater.bot.tierlist
 
 import dev.kord.common.Color
 import dev.kord.common.entity.ButtonStyle
-import dev.kord.common.entity.Snowflake
 import dev.kord.common.entity.TextInputStyle
-import dev.kord.core.behavior.channel.MessageChannelBehavior
 import dev.kord.core.behavior.channel.createMessage
 import dev.kord.core.behavior.edit
 import dev.kord.core.behavior.interaction.modal
+import dev.kord.core.behavior.interaction.respondEphemeral
+import dev.kord.core.behavior.interaction.respondPublic
+import dev.kord.core.cache.data.toData
 import dev.kord.core.entity.channel.TextChannel
 import dev.kord.core.entity.channel.thread.ThreadChannel
 import dev.kord.core.entity.interaction.SelectMenuInteraction
+import dev.kord.core.event.interaction.ChatInputCommandInteractionCreateEvent
 import dev.kord.core.event.interaction.ComponentInteractionCreateEvent
 import dev.kord.core.event.interaction.ModalSubmitInteractionCreateEvent
 import dev.kord.rest.builder.component.ActionRowBuilder
@@ -22,12 +24,26 @@ import dev.kord.rest.builder.message.embed
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
-suspend fun createThread(name: String, tierlist: Tierlist, channel: MessageChannelBehavior, messageId: Snowflake): ReferencedTierlist {
-    val thread = (channel.fetchChannel() as? TextChannel)?.startPublicThreadWithMessage(
-        messageId, name
-    ) ?: channel
+suspend fun ChatInputCommandInteractionCreateEvent.onTierlist() {
+    if (interaction.channel in STATE) {
+        interaction.respondEphemeral {
+            content = "This channel already has an active tierlist in it!"
+        }
+        return
+    }
 
-    return ReferencedTierlist(channel.id, messageId, thread.id, tierlist)
+    val name = interaction.command.strings["name"] ?: return
+    val tierlist = Tierlist(name)
+
+    val response = interaction.respondPublic {
+        initTierList(tierlist)
+    }
+    val responseData = kord.rest.interaction.getInteractionResponse(response.applicationId, response.token).toData()
+
+    val thread = (interaction.channel.fetchChannel() as? TextChannel)
+        ?.startPublicThreadWithMessage(responseData.id, name) ?: interaction.channel
+    STATE[interaction.channel] = ReferencedTierlist(interaction.channel.id, responseData.id, thread.id, tierlist)
+    saveState()
 }
 
 fun MessageBuilder.initTierList(tierlist: ReferencedTierlist) {
@@ -35,11 +51,14 @@ fun MessageBuilder.initTierList(tierlist: ReferencedTierlist) {
 }
 
 fun MessageBuilder.initTierList(tierlist: Tierlist, selected: String? = null, controls: Boolean = true) {
+    embed {
+        description = "# ${tierlist.name}"
+    }
     for (tier in tierlist.tiers) {
         embed {
             title = tier.name
             color = Color(tier.color)
-            description = tier.entries.joinToString("\n")
+            description = tier.entries.joinToString(", ")
         }
     }
     if (!controls) {
@@ -49,9 +68,6 @@ fun MessageBuilder.initTierList(tierlist: Tierlist, selected: String? = null, co
     actionRow {
         interactionButton(ButtonStyle.Success, "add") {
             label = "Add"
-        }
-        interactionButton(ButtonStyle.Danger, "done") {
-            label = "Done"
         }
     }
     actionRow {
@@ -63,6 +79,11 @@ fun MessageBuilder.initTierList(tierlist: Tierlist, selected: String? = null, co
         tiersSelection("move_tier", tierlist) {
             placeholder = "Move to tier"
             disabled = selected == null
+        }
+    }
+    actionRow {
+        interactionButton(ButtonStyle.Danger, "done") {
+            label = "Done"
         }
     }
 }
