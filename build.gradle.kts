@@ -38,5 +38,5 @@ compileKotlin.compilerOptions {
 }
 
 application {
-    mainClass = "archives.tater.discordito.Main"
+    mainClass = "archives.tater.bot.tierlist.Main"
 }
