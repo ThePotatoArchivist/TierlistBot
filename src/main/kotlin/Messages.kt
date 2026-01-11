@@ -17,6 +17,8 @@ import dev.kord.rest.builder.component.option
 import dev.kord.rest.builder.message.MessageBuilder
 import dev.kord.rest.builder.message.actionRow
 import dev.kord.rest.builder.message.embed
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 suspend fun createThread(name: String, tierlist: Tierlist, channel: MessageChannelBehavior, messageId: Snowflake): ReferencedTierlist {
     val thread = (channel.fetchChannel() as? TextChannel)?.startPublicThreadWithMessage(
@@ -63,12 +65,20 @@ suspend fun ModalSubmitInteractionCreateEvent.onAdd() {
     val entry = TierEntry(interaction.textInputs["name"]?.value ?: return, "")
     val tier = tierlist.tierlist.tiers.first()
     tier.entries.add(entry)
-    saveState()
-    tierlist.message().edit {
-        initTierList(tierlist.tierlist)
-    }
-    tierlist.thread().createMessage {
-        content = "**${interaction.user.displayName}** added **$entry** to **${tier.name}**"
+    coroutineScope {
+        launch {
+            saveState()
+        }
+        launch {
+            tierlist.message().edit {
+                initTierList(tierlist.tierlist)
+            }
+        }
+        launch {
+            tierlist.thread().createMessage {
+                content = "**${interaction.user.displayName}** added **$entry** to **${tier.name}**"
+            }
+        }
     }
 }
 
