@@ -52,8 +52,8 @@ suspend fun main() {
             when (interaction.componentId) {
                 "add" -> onAdd()
                 "done" -> onDone()
+                "tier" -> onTier()
                 "move_entry" -> onMoveEntry()
-                "move_tier" -> onMoveTier()
             }
         }
 

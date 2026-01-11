@@ -47,10 +47,10 @@ suspend fun ChatInputCommandInteractionCreateEvent.onTierlist() {
 }
 
 fun MessageBuilder.initTierList(tierlist: ReferencedTierlist) {
-    initTierList(tierlist.tierlist, tierlist.selectedEntry)
+    initTierList(tierlist.tierlist, tierlist.selectedTier)
 }
 
-fun MessageBuilder.initTierList(tierlist: Tierlist, selected: String? = null, controls: Boolean = true) {
+fun MessageBuilder.initTierList(tierlist: Tierlist, selected: Tier = tierlist.tiers.first(), controls: Boolean = true) {
     embed {
         description = "# ${tierlist.name}"
     }
@@ -66,19 +66,16 @@ fun MessageBuilder.initTierList(tierlist: Tierlist, selected: String? = null, co
         return
     }
     actionRow {
+        tiersSelection("tier", tierlist, selected)
+    }
+    actionRow {
         interactionButton(ButtonStyle.Success, "add") {
             label = "Add"
         }
     }
     actionRow {
-        entriesSelection("move_entry", tierlist, selected) {
-            placeholder = "Choose entry to move"
-        }
-    }
-    actionRow {
-        tiersSelection("move_tier", tierlist) {
-            placeholder = "Move to tier"
-            disabled = selected == null
+        entriesSelection("move_entry", tierlist) {
+            placeholder = "Move entry to tier"
         }
     }
     actionRow {
@@ -103,7 +100,7 @@ suspend fun ModalSubmitInteractionCreateEvent.onAdd() {
 
     interaction.deferPublicMessageUpdate()
     val tierlist = STATE[interaction.channel]
-    val tier = tierlist.tierlist.tiers.first()
+    val tier = tierlist.selectedTier
     tier.entries.add(entry)
 
     coroutineScope {
@@ -123,22 +120,22 @@ suspend fun ModalSubmitInteractionCreateEvent.onAdd() {
     }
 }
 
-suspend fun ComponentInteractionCreateEvent.onMoveEntry() {
-    val entry = (interaction as SelectMenuInteraction).values.firstOrNull() ?: return
-    interaction.deferPublicMessageUpdate()
+suspend fun ComponentInteractionCreateEvent.onTier() {
+    val tierId = (interaction as SelectMenuInteraction).values.firstOrNull() ?: return
     val tierlist = STATE[interaction.channel]
-    tierlist.selectedEntry = entry
+    val tier = tierlist.tierlist.tiers[tierId.toInt()]
+    interaction.deferPublicMessageUpdate()
+    tierlist.selectedTier = tier
     saveState()
     tierlist.message().edit {
         initTierList(tierlist)
     }
 }
 
-suspend fun ComponentInteractionCreateEvent.onMoveTier() {
-    val tierId = (interaction as SelectMenuInteraction).values.firstOrNull() ?: return
+suspend fun ComponentInteractionCreateEvent.onMoveEntry() {
+    val entry = (interaction as SelectMenuInteraction).values.firstOrNull() ?: return
     val tierlist = STATE[interaction.channel]
-    val entry = tierlist.selectedEntry ?: return
-    val tier = tierlist.tierlist.tiers[tierId.toInt()]
+    val tier = tierlist.selectedTier
     interaction.deferPublicMessageUpdate()
     for (tier in tierlist.tierlist.tiers)
         tier.entries.remove(entry)
@@ -184,7 +181,7 @@ suspend fun ComponentInteractionCreateEvent.onDone() {
     }
 }
 
-fun ActionRowBuilder.entriesSelection(customId: String, tierlist: Tierlist, selected: String?, builder: StringSelectBuilder.() -> Unit = {}) {
+fun ActionRowBuilder.entriesSelection(customId: String, tierlist: Tierlist, selected: String? = null, builder: StringSelectBuilder.() -> Unit = {}) {
     stringSelect(customId) {
         val entries = tierlist.tiers.flatMap { it.entries }
         if (entries.isEmpty()) {
@@ -201,10 +198,12 @@ fun ActionRowBuilder.entriesSelection(customId: String, tierlist: Tierlist, sele
     }
 }
 
-fun ActionRowBuilder.tiersSelection(customId: String, tierlist: Tierlist, builder: StringSelectBuilder.() -> Unit = {}) {
+fun ActionRowBuilder.tiersSelection(customId: String, tierlist: Tierlist, selected: Tier? = null, builder: StringSelectBuilder.() -> Unit = {}) {
     stringSelect(customId) {
         tierlist.tiers.forEachIndexed { index, tier ->
-            option(tier.name, index.toString())
+            option(tier.name, index.toString()) {
+                default = tier == selected
+            }
         }
         builder()
     }

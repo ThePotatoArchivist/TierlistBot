@@ -28,8 +28,13 @@ data class ReferencedTierlist(
     val messageId: Snowflake,
     val threadId: Snowflake,
     val tierlist: Tierlist,
-    var selectedEntry: String? = null,
+    var selectedTierIndex: Int = 0
 ) {
+    var selectedTier
+        get() = tierlist.tiers[selectedTierIndex]
+        set(value) {
+            selectedTierIndex = tierlist.tiers.indexOf(value)
+        }
     @Transient val message = contextualMemoize<KordObject, _> { it.kord.unsafe.message(channelId, messageId) }
     @Transient val thread = contextualMemoize<KordObject, _> { it.kord.unsafe.messageChannel(threadId) }
 }
