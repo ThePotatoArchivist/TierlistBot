@@ -50,7 +50,12 @@ data class Tierlist(
         Tier("D", 0x7fff00),
         Tier("F", 0x00ff00),
     ),
-)
+) {
+    fun remove(entry: String) {
+        for (tier in tiers)
+            tier.entries.remove(entry)
+    }
+}
 
 @Serializable
 data class Tier(

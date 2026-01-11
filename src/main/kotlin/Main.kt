@@ -54,6 +54,7 @@ suspend fun main() {
                 "done" -> onDone()
                 "tier" -> onTier()
                 "move_entry" -> onMoveEntry()
+                "remove_entry" -> onRemoveEntry()
             }
         }
 

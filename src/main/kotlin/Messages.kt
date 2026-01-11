@@ -3,6 +3,7 @@ package archives.tater.bot.tierlist
 import dev.kord.common.Color
 import dev.kord.common.entity.ButtonStyle
 import dev.kord.common.entity.TextInputStyle
+import dev.kord.core.KordObject
 import dev.kord.core.behavior.channel.createMessage
 import dev.kord.core.behavior.edit
 import dev.kord.core.behavior.interaction.modal
@@ -23,6 +24,25 @@ import dev.kord.rest.builder.message.actionRow
 import dev.kord.rest.builder.message.embed
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+
+context(kordObject: KordObject)
+suspend fun commitChange(tierlist: ReferencedTierlist, message: String) {
+    coroutineScope {
+        launch {
+            saveState()
+        }
+        launch {
+            tierlist.message().edit {
+                initTierList(tierlist)
+            }
+        }
+        launch {
+            tierlist.thread().createMessage {
+                content = message
+            }
+        }
+    }
+}
 
 suspend fun ChatInputCommandInteractionCreateEvent.onTierlist() {
     if (interaction.channel in STATE) {
@@ -79,6 +99,11 @@ fun MessageBuilder.initTierList(tierlist: Tierlist, selected: Tier = tierlist.ti
         }
     }
     actionRow {
+        entriesSelection("remove_entry", tierlist) {
+            placeholder = "Remove entry"
+        }
+    }
+    actionRow {
         interactionButton(ButtonStyle.Danger, "done") {
             label = "Done"
         }
@@ -97,27 +122,19 @@ suspend fun ComponentInteractionCreateEvent.onAdd() {
 
 suspend fun ModalSubmitInteractionCreateEvent.onAdd() {
     val entry = interaction.textInputs["name"]?.value ?: return
-
-    interaction.deferPublicMessageUpdate()
     val tierlist = STATE[interaction.channel]
     val tier = tierlist.selectedTier
+    if (tierlist.tierlist.tiers.any { entry in it.entries }) {
+        interaction.respondEphemeral {
+            content = "**$entry** is already in the tierlist"
+        }
+        return
+    }
+
+    interaction.deferPublicMessageUpdate()
     tier.entries.add(entry)
 
-    coroutineScope {
-        launch {
-            saveState()
-        }
-        launch {
-            tierlist.message().edit {
-                initTierList(tierlist)
-            }
-        }
-        launch {
-            tierlist.thread().createMessage {
-                content = "**${interaction.user.displayName}** added **$entry** to **${tier.name}**"
-            }
-        }
-    }
+    commitChange(tierlist, "**${interaction.user.displayName}** added **$entry** to **${tier.name}**")
 }
 
 suspend fun ComponentInteractionCreateEvent.onTier() {
@@ -137,48 +154,28 @@ suspend fun ComponentInteractionCreateEvent.onMoveEntry() {
     val tierlist = STATE[interaction.channel]
     val tier = tierlist.selectedTier
     interaction.deferPublicMessageUpdate()
-    for (tier in tierlist.tierlist.tiers)
-        tier.entries.remove(entry)
+    tierlist.tierlist.remove(entry)
     tier.entries.add(entry)
-    coroutineScope {
-        launch {
-            saveState()
-        }
-        launch {
-            tierlist.message().edit {
-                initTierList(tierlist)
-            }
-        }
-        launch {
-            tierlist.thread().createMessage {
-                content = "**${interaction.user.displayName}** moved **$entry** to **${tier.name}**"
-            }
-        }
-    }
+
+    commitChange(tierlist, "**${interaction.user.displayName}** moved **$entry** to **${tier.name}**")
+}
+
+suspend fun ComponentInteractionCreateEvent.onRemoveEntry() {
+    val entry = (interaction as SelectMenuInteraction).values.firstOrNull() ?: return
+    val tierlist = STATE[interaction.channel]
+    interaction.deferPublicMessageUpdate()
+    tierlist.tierlist.remove(entry)
+
+    commitChange(tierlist, "**${interaction.user.displayName}** removed **$entry**")
 }
 
 suspend fun ComponentInteractionCreateEvent.onDone() {
     val tierlist = STATE[interaction.channel]
     interaction.deferPublicMessageUpdate()
     STATE.remove(interaction.channel)
-    coroutineScope {
-        launch {
-            tierlist.message().edit {
-                initTierList(tierlist.tierlist, controls = false)
-            }
-        }
-        launch {
-            with(tierlist.thread()) {
-                createMessage {
-                    content = "**${interaction.user.displayName}** finalized the list"
-                }
-                (fetchChannel() as? ThreadChannel)?.leave()
-            }
-        }
-        launch {
-            saveState()
-        }
-    }
+
+    commitChange(tierlist, "**${interaction.user.displayName}** finalized the list")
+    (tierlist.thread().fetchChannel() as? ThreadChannel)?.leave()
 }
 
 fun ActionRowBuilder.entriesSelection(customId: String, tierlist: Tierlist, selected: String? = null, builder: StringSelectBuilder.() -> Unit = {}) {
