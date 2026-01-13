@@ -10,6 +10,7 @@ import dev.kord.core.behavior.interaction.modal
 import dev.kord.core.behavior.interaction.respondEphemeral
 import dev.kord.core.behavior.interaction.respondPublic
 import dev.kord.core.cache.data.toData
+import dev.kord.core.entity.User
 import dev.kord.core.entity.channel.TextChannel
 import dev.kord.core.entity.channel.thread.ThreadChannel
 import dev.kord.core.entity.interaction.SelectMenuInteraction
@@ -25,20 +26,29 @@ import dev.kord.rest.builder.message.embed
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
-context(kordObject: KordObject)
-suspend fun commitChange(tierlist: ReferencedTierlist, message: String) {
+context(_: KordObject)
+suspend fun addToThread(tierlist: ReferencedTierlist, user: User) {
+    if (user.id in tierlist.joined) return
+    tierlist.thread().createMessage {
+        content = "${user.mention} joined the tier list"
+    }
+}
+
+context(_: KordObject)
+suspend fun commitChange(tierlist: ReferencedTierlist, user: User, message: String, controls: Boolean = true) {
     coroutineScope {
         launch {
             saveState()
         }
         launch {
             tierlist.message().edit {
-                initTierList(tierlist)
+                initTierList(tierlist, controls)
             }
         }
         launch {
+            addToThread(tierlist, user)
             tierlist.thread().createMessage {
-                content = message
+                content = "**${user.displayName}** $message"
             }
         }
     }
@@ -66,8 +76,8 @@ suspend fun ChatInputCommandInteractionCreateEvent.onTierlist() {
     saveState()
 }
 
-fun MessageBuilder.initTierList(tierlist: ReferencedTierlist) {
-    initTierList(tierlist.tierlist, tierlist.selectedTier)
+fun MessageBuilder.initTierList(tierlist: ReferencedTierlist, controls: Boolean = true) {
+    initTierList(tierlist.tierlist, tierlist.selectedTier, controls)
 }
 
 fun MessageBuilder.initTierList(tierlist: Tierlist, selected: Tier = tierlist.tiers.first(), controls: Boolean = true) {
@@ -134,7 +144,7 @@ suspend fun ModalSubmitInteractionCreateEvent.onAdd() {
     interaction.deferPublicMessageUpdate()
     tier.entries.add(entry)
 
-    commitChange(tierlist, "**${interaction.user.displayName}** added **$entry** to **${tier.name}**")
+    commitChange(tierlist, interaction.user, "added **$entry** to **${tier.name}**")
 }
 
 suspend fun ComponentInteractionCreateEvent.onTier() {
@@ -164,7 +174,7 @@ suspend fun ComponentInteractionCreateEvent.onMoveEntry() {
     oldTier.entries.remove(entry)
     tier.entries.add(entry)
 
-    commitChange(tierlist, "**${interaction.user.displayName}** moved **$entry** from **${oldTier.name}** to **${tier.name}**")
+    commitChange(tierlist, interaction.user, "moved **$entry** from **${oldTier.name}** to **${tier.name}**")
 }
 
 suspend fun ComponentInteractionCreateEvent.onRemoveEntry() {
@@ -173,7 +183,7 @@ suspend fun ComponentInteractionCreateEvent.onRemoveEntry() {
     interaction.deferPublicMessageUpdate()
     tierlist.tierlist.remove(entry)
 
-    commitChange(tierlist, "**${interaction.user.displayName}** removed **$entry**")
+    commitChange(tierlist, interaction.user, "removed **$entry**")
 }
 
 suspend fun ComponentInteractionCreateEvent.onDone() {
@@ -181,7 +191,7 @@ suspend fun ComponentInteractionCreateEvent.onDone() {
     interaction.deferPublicMessageUpdate()
     STATE.remove(interaction.channel)
 
-    commitChange(tierlist, "**${interaction.user.displayName}** finalized the list")
+    commitChange(tierlist, interaction.user, "finalized the list", controls = false)
     (tierlist.thread().fetchChannel() as? ThreadChannel)?.leave()
 }
 

@@ -28,6 +28,7 @@ data class ReferencedTierlist(
     val messageId: Snowflake,
     val threadId: Snowflake,
     val tierlist: Tierlist,
+    val joined: MutableSet<Snowflake> = mutableSetOf(),
     var selectedTierIndex: Int = 0
 ) {
     var selectedTier
